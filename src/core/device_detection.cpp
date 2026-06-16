@@ -91,7 +91,7 @@ DeviceInfo auto_detect() {
     // overrides to TorchTRT when the caller hands in a .ts artifact.
     for (size_t i = 0; i < gpus.size(); ++i) {
         const auto& gpu = gpus[i];
-        if (gpu.cuda_available && gpu.compute_capability_major >= 8) {
+        if (gpu.cuda_available && (gpu.compute_capability_major > 7 || (gpu.compute_capability_major == 7 && gpu.compute_capability_minor >= 5))) {
             device.name = gpu.adapter_name + " (TensorRT)";
             device.backend = Backend::TensorRT;
             device.available_memory_mb = gpu.dedicated_memory_mb;
@@ -148,7 +148,7 @@ std::vector<DeviceInfo> list_devices() {
     // torchtrt and the package validator sees both families present.
     for (size_t i = 0; i < gpus.size(); ++i) {
         const auto& gpu = gpus[i];
-        if (gpu.cuda_available && gpu.compute_capability_major >= 8) {
+        if (gpu.cuda_available && (gpu.compute_capability_major > 7 || (gpu.compute_capability_major == 7 && gpu.compute_capability_minor >= 5))) {
             devices.push_back({gpu.adapter_name + " (TensorRT)", gpu.dedicated_memory_mb,
                                Backend::TensorRT, static_cast<int>(i)});
             devices.push_back({gpu.adapter_name + " (TorchTRT)", gpu.dedicated_memory_mb,
