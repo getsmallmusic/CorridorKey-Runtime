@@ -28,7 +28,7 @@ jobs:
         env:
           VCPKG_ROOT: C:\vcpkg
         run: |
-          .\scripts\windows.ps1 -Task release -Version 0.8.4-rtx20 -Track dml
+           .\scripts\windows.ps1 -Task release -Version 0.8.4 -Track dml
         shell: pwsh
 
       - name: Upload installer
