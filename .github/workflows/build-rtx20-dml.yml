@@ -1,0 +1,32 @@
+name: Build 0.8.4 for RTX 20-series
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg C:\vcpkg
+          C:\vcpkg\bootstrap-vcpkg.bat
+        shell: pwsh
+
+      - name: Build DirectML release
+        env:
+          VCPKG_ROOT: C:\vcpkg
+        run: |
+          .\scripts\windows.ps1 -Task release -Version 0.8.4-rtx20 -Track dml
+        shell: pwsh
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: CorridorKey-0.8.4-RTX20
+          path: build/dist/*DirectML*.exe
+          retention-days: 7
+
