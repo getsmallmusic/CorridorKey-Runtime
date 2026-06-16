@@ -1,4 +1,4 @@
-name: Build 0.8.4 for RTX 20-series
+name: Build RTX20 DirectML
 
 on:
   workflow_dispatch:
@@ -8,12 +8,23 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 120
     steps:
-      - name: Checkout with LFS
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           lfs: true
           submodules: recursive
           fetch-depth: 0
+
+      - name: Patch for Turing (RTX 20xx)
+        shell: pwsh
+        run: |
+          # 1) 放宽 GPU 检查：8.0 → 7.5
+          $cap = "src/host/gpu/capability.cpp"
+          (Get-Content $cap) -replace 'props\.major < 8', 'props.major < 7 -or (props.major -eq 7 -and props.minor -lt 5)' | Set-Content $cap
+
+          # 2) 让 CMake 也编 sm_75
+          $cmake = "CMakeLists.txt"
+          (Get-Content $cmake) -replace 'set\(CMAKE_CUDA_ARCHITECTURES .*\)', 'set(CMAKE_CUDA_ARCHITECTURES "75;80;86;89;90")' | Set-Content $cmake
 
       - name: Setup vcpkg
         run: |
@@ -21,31 +32,24 @@ jobs:
           C:\vcpkg\bootstrap-vcpkg.bat
         shell: cmd
 
-      - name: Allow PowerShell
-        run: Set-ExecutionPolicy Bypass -Scope Process -Force
-        shell: pwsh
-
-      - name: Build only (skip release checks)
-        env:
-          VCPKG_ROOT: C:\vkg
-          VCPKG_ROOT: C:\vcpkg
-        run: |
-          .\scripts\windows.ps1 -Task build -Preset release
-        shell: pwsh
-
-      - name: Package DirectML manually
+      - name: Build
         env:
           VCPKG_ROOT: C:\vcpkg
         run: |
-          # 直接用 build 产物，不走 release_pipeline
-          mkdir build\dist
-          xcopy /E /I build\release\bin build\dist\CorridorKey\
+          Set-ExecutionPolicy Bypass -Scope Process -Force
+          cmake --preset release -DCMAKE_CUDA_ARCHITECTURES="75;80;86;89;90"
+          cmake --build --preset release -j 2
+        shell: pwsh
+
+      - name: Collect OFX
+        run: |
+          mkdir dist
+          xcopy build\release\bin\CorridorKey.ofx.bundle dist\ /E /I
         shell: cmd
 
-      - name: Upload build
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: CorridorKey-0.8.4-RTX20-DirectML
-          path: build/dist/
-          retention-days: 7
+          name: CorridorKey-RTX20-0.8.4
+          path: dist/
 
