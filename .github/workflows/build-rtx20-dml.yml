@@ -6,7 +6,8 @@ on:
 jobs:
   build:
     runs-on: windows-2022
-    timeout-minutes: 120
+    timeout-minutes: 240   # ← 从 120 改成 240
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,11 +30,8 @@ jobs:
       - name: Patch for Turing (RTX 20xx)
         shell: pwsh
         run: |
-          # 1) 放宽 GPU 检查：8.0 → 7.5
           $cap = "src/core/device_detection.cpp"
           (Get-Content $cap -Raw) -replace 'compute_capability_major >= 8', 'compute_capability_major > 7 || (compute_capability_major == 7 && compute_capability_minor >= 5)' | Set-Content $cap
-
-          # 2) 让 CMake 也编 sm_75
           $cmake = "CMakeLists.txt"
           (Get-Content $cmake) -replace 'set\(CMAKE_CUDA_ARCHITECTURES.*\)', 'set(CMAKE_CUDA_ARCHITECTURES "75;80;86;89;90")' | Set-Content $cmake
 
@@ -43,18 +41,34 @@ jobs:
           if not exist C:\vcpkg git clone https://github.com/microsoft/vcpkg C:\vcpkg
           call C:\vcpkg\bootstrap-vcpkg.bat
 
+      # ← 新增：缓存 vcpkg 编好的包
+      - name: Cache vcpkg
+        uses: actions/cache@v4
+        with:
+          path: |
+            C:\vcpkg\installed
+            C:\vcpkg\packages
+            build\vcpkg_installed
+          key: vcpkg-${{ runner.os }}-static-${{ hashFiles('**/vcpkg.json', 'CMakeLists.txt') }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-static-
+
       - name: Configure
         shell: pwsh
         env:
           VCPKG_ROOT: C:\vcpkg
+          VCPKG_DEFAULT_TRIPLET: x64-windows-static
+          VCPKG_BUILD_TYPE: release   # ← 关键：只编 release，不编 dbg
         run: |
           Set-ExecutionPolicy Bypass -Scope Process -Force
-          cmake --preset release
+          cmake --preset release -DVCPKG_TARGET_TRIPLET=x64-windows-static -DVCPKG_BUILD_TYPE=release
 
       - name: Build
         shell: pwsh
         env:
           VCPKG_ROOT: C:\vcpkg
+          VCPKG_DEFAULT_TRIPLET: x64-windows-static
+          VCPKG_BUILD_TYPE: release
         run: |
           cmake --build --preset release --parallel 2
 
@@ -63,7 +77,7 @@ jobs:
         run: |
           mkdir dist -Force | Out-Null
           $src = Get-ChildItem -Path build -Recurse -Filter "CorridorKey.ofx.bundle" -Directory | Select-Object -First 1
-          if (-not $src) { throw "找不到 CorridorKey.ofx.bundle，检查 build 目录" }
+          if (-not $src) { throw "找不到 CorridorKey.ofx.bundle" }
           xcopy $src.FullName dist\ /E /I /Y
 
       - name: Upload
