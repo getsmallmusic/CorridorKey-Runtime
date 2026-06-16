@@ -15,23 +15,21 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
-      # 1) 激活 VS2022 环境，否则 CMake 找不到 cl.exe
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
 
-      # 2) 装 CUDA 12.9（官方 v0.8.4 开始用 12.9）
       - name: Setup CUDA
-        uses: Jimver/cuda-toolkit@v0.2.19
+        uses: Jimver/cuda-toolkit@v0.2.35
         with:
-          cuda: '12.9.0'
+          cuda: '12.9.1'
           method: 'network'
 
       - name: Patch for Turing (RTX 20xx)
         shell: pwsh
         run: |
-          # 1) 放宽 GPU 检查：8.0 → 7.5，正确文件是 device_detection.cpp
+          # 1) 放宽 GPU 检查：8.0 → 7.5
           $cap = "src/core/device_detection.cpp"
           (Get-Content $cap -Raw) -replace 'compute_capability_major >= 8', 'compute_capability_major > 7 || (compute_capability_major == 7 && compute_capability_minor >= 5)' | Set-Content $cap
 
