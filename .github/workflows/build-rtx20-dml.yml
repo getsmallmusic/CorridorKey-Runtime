@@ -19,8 +19,8 @@ jobs:
         shell: pwsh
         run: |
           # 1) 放宽 GPU 检查：8.0 → 7.5
-          $cap = "src/host/gpu/capability.cpp"
-          (Get-Content $cap) -replace 'props\.major < 8', 'props.major < 7 -or (props.major -eq 7 -and props.minor -lt 5)' | Set-Content $cap
+          $cap = "src/core/device_detection.cpp"
+          (Get-Content $cap) -replace 'compute_capability_major >= 8', 'compute_capability_major > 7 || (compute_capability_major == 7 && compute_capability_minor >= 5)' | Set-Content $cap
 
           # 2) 让 CMake 也编 sm_75
           $cmake = "CMakeLists.txt"
@@ -52,4 +52,3 @@ jobs:
         with:
           name: CorridorKey-RTX20-0.8.4
           path: dist/
-
