@@ -15,7 +15,7 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
-      # 1) 关键：激活 VS2022 环境，否则 CMake 找不到 cl.exe
+      # 1) 激活 VS2022 环境，否则 CMake 找不到 cl.exe
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
         with:
@@ -31,9 +31,11 @@ jobs:
       - name: Patch for Turing (RTX 20xx)
         shell: pwsh
         run: |
-          $cap = "src/host/gpu/capability.cpp"
-          (Get-Content $cap) -replace 'props\.major < 8', 'props.major < 7 -or (props.major -eq 7 -and props.minor -lt 5)' | Set-Content $cap
+          # 1) 放宽 GPU 检查：8.0 → 7.5，正确文件是 device_detection.cpp
+          $cap = "src/core/device_detection.cpp"
+          (Get-Content $cap -Raw) -replace 'compute_capability_major >= 8', 'compute_capability_major > 7 || (compute_capability_major == 7 && compute_capability_minor >= 5)' | Set-Content $cap
 
+          # 2) 让 CMake 也编 sm_75
           $cmake = "CMakeLists.txt"
           (Get-Content $cmake) -replace 'set\(CMAKE_CUDA_ARCHITECTURES.*\)', 'set(CMAKE_CUDA_ARCHITECTURES "75;80;86;89;90")' | Set-Content $cmake
 
@@ -49,7 +51,6 @@ jobs:
           VCPKG_ROOT: C:\vcpkg
         run: |
           Set-ExecutionPolicy Bypass -Scope Process -Force
-          # 用 preset，架构已在上面 patch 好，不用再传 -D
           cmake --preset release
 
       - name: Build
@@ -57,14 +58,12 @@ jobs:
         env:
           VCPKG_ROOT: C:\vcpkg
         run: |
-          # 正确传并行参数给 preset
           cmake --build --preset release --parallel 2
 
       - name: Collect OFX
         shell: pwsh
         run: |
           mkdir dist -Force | Out-Null
-          # preset 的 binaryDir 是 build，根据 Ninja 单配置输出在 build/bin
           $src = Get-ChildItem -Path build -Recurse -Filter "CorridorKey.ofx.bundle" -Directory | Select-Object -First 1
           if (-not $src) { throw "找不到 CorridorKey.ofx.bundle，检查 build 目录" }
           xcopy $src.FullName dist\ /E /I /Y
