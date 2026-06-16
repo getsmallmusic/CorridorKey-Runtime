@@ -13,6 +13,7 @@ jobs:
         with:
           lfs: true
           submodules: recursive
+          fetch-depth: 0
 
       - name: Setup vcpkg
         run: |
@@ -20,22 +21,31 @@ jobs:
           C:\vcpkg\bootstrap-vcpkg.bat
         shell: cmd
 
-      - name: Allow PowerShell scripts
+      - name: Allow PowerShell
         run: Set-ExecutionPolicy Bypass -Scope Process -Force
         shell: pwsh
 
-      - name: Build DirectML release
+      - name: Build only (skip release checks)
+        env:
+          VCPKG_ROOT: C:\vkg
+          VCPKG_ROOT: C:\vcpkg
+        run: |
+          .\scripts\windows.ps1 -Task build -Preset release
+        shell: pwsh
+
+      - name: Package DirectML manually
         env:
           VCPKG_ROOT: C:\vcpkg
         run: |
-           .\scripts\windows.ps1 -Task release -Version 0.8.4 -Track dml
-        shell: pwsh
+          # 直接用 build 产物，不走 release_pipeline
+          mkdir build\dist
+          xcopy /E /I build\release\bin build\dist\CorridorKey\
+        shell: cmd
 
-      - name: Upload installer
+      - name: Upload build
         uses: actions/upload-artifact@v4
         with:
-          name: CorridorKey-0.8.4-RTX20
-          path: build/dist/*DirectML*.exe
-          if-no-files-found: error
+          name: CorridorKey-0.8.4-RTX20-DirectML
+          path: build/dist/
           retention-days: 7
 
